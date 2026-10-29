@@ -117,6 +117,7 @@ Docker build.
   and properly managed TLS certificates for any non-demo deployment.
 
 See [architecture](docs/architecture.md),
+[next-step handoff](docs/next-steps.md),
 [requirements traceability](docs/requirements-traceability.md),
 [risk analysis](docs/risk-analysis.md),
 [SOUP list](docs/soup-list.md), and the
