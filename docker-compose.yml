@@ -1,0 +1,15 @@
+services:
+  receiver:
+    build: .
+    environment:
+      DICOM_FLOW_AE_TITLE: ${DICOM_FLOW_AE_TITLE:-DICOMFLOW}
+      DICOM_FLOW_PORT: ${DICOM_FLOW_PORT:-11112}
+      DICOM_FLOW_STORAGE_DIR: /data/received
+      DICOM_FLOW_ALLOWED_CALLING_AE_TITLES: ${DICOM_FLOW_ALLOWED_CALLING_AE_TITLES:-SYNTHETIC_SCU}
+    ports:
+      - "${DICOM_FLOW_PORT:-11112}:${DICOM_FLOW_PORT:-11112}"
+    volumes:
+      - received-data:/data/received
+
+volumes:
+  received-data:
