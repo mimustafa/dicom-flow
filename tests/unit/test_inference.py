@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from dicom_flow.inference.config import load_config
@@ -37,3 +38,17 @@ def test_mock_inference_is_deterministic() -> None:
 
     assert result_a == result_b
     assert result_a.classification == "demo-positive"
+
+
+def test_mock_inference_matches_golden_output() -> None:
+    config = load_config(CONFIG)
+    actual = infer_instance(
+        bytes(range(256)) * 16,
+        rows=64,
+        columns=64,
+        config=config,
+        instance_seed=1,
+    )
+    expected_path = Path(__file__).parents[1] / "fixtures" / "golden_inference.json"
+    expected = json.loads(expected_path.read_text(encoding="utf-8"))
+    assert actual.model_dump(mode="json") == expected

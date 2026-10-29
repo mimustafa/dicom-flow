@@ -3,8 +3,9 @@ import logging
 from collections.abc import Sequence
 from pathlib import Path
 
-from dicom_flow.common.config import ReceiverSettings, WorkerSettings
+from dicom_flow.common.config import ForwarderSettings, ReceiverSettings, WorkerSettings
 from dicom_flow.common.logging import configure_logging
+from dicom_flow.forwarder.service import run_forwarder
 from dicom_flow.receiver.client import collect_dicom_files, send_instances
 from dicom_flow.receiver.server import create_receiver
 from dicom_flow.synthetic import create_synthetic_study
@@ -24,6 +25,9 @@ def _parser() -> argparse.ArgumentParser:
 
     commands.add_parser("serve", help="run the DICOM C-STORE receiver")
     commands.add_parser("worker", help="run the Redis-backed DICOM processing worker")
+    commands.add_parser("forwarder", help="forward result DICOM objects to a trusted node")
+    health = commands.add_parser("health", help="check service readiness")
+    health.add_argument("service", choices=("receiver", "worker", "forwarder", "orthanc"))
 
     send = commands.add_parser("send", help="C-ECHO and C-STORE DICOM files to a receiver")
     send.add_argument("path", type=Path)
@@ -56,6 +60,14 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     if args.command == "worker":
         run_worker(WorkerSettings())
+        return
+    if args.command == "forwarder":
+        run_forwarder(ForwarderSettings())
+        return
+    if args.command == "health":
+        from dicom_flow.common.health import check_health
+
+        check_health(args.service)
         return
 
     files = collect_dicom_files(args.path)

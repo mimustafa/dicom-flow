@@ -61,7 +61,7 @@ def process_message(
             report_dir=settings.report_dir,
             config=config,
         )
-    except (InvalidDicomError, KeyError, OSError, ValueError):
+    except (InvalidDicomError, KeyError, OSError, ValueError) as error:
         target_stream = handle_failure(
             redis_client,
             stream=settings.event_stream,
@@ -72,11 +72,16 @@ def process_message(
             max_attempts=settings.max_attempts,
         )
         LOGGER.warning(
-            "study_processing_failed",
+            "study_processing_failed (%s)",
+            type(error).__name__,
             extra={"retry_stream": target_stream},
         )
         return
 
+    redis_client.xadd(
+        settings.forward_stream,
+        {"study_uid": study_uid, "attempt": "0"},
+    )
     redis_client.xack(settings.event_stream, settings.consumer_group, message_id)
 
 

@@ -44,6 +44,7 @@ def test_send_to_receiver_produces_study_report(
         redis_url="redis://localhost:6379/0",
         event_stream=stream,
         dead_letter_stream=f"{stream}:dead",
+        forward_stream=f"{stream}:forward",
         consumer_group=group,
         consumer_name="test-worker",
         storage_dir=tmp_path / "received",
@@ -61,4 +62,4 @@ def test_send_to_receiver_produces_study_report(
     assert '"config_hash":' in result
     assert "Demo only. Not for clinical use." in result
     assert "Demo only. Not for clinical use." in report_path.read_text(encoding="utf-8")
-    redis_client.delete(stream, f"{stream}:dead")
+    redis_client.delete(stream, f"{stream}:dead", f"{stream}:forward")

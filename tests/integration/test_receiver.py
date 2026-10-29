@@ -7,7 +7,6 @@ from pynetdicom import AE
 from dicom_flow.common.config import ReceiverSettings
 from dicom_flow.common.constants import ULTRASOUND_IMAGE_STORAGE, VERIFICATION
 from dicom_flow.receiver.server import create_receiver
-from dicom_flow.synthetic import create_synthetic_study
 
 
 class RecordingPublisher:
@@ -18,8 +17,11 @@ class RecordingPublisher:
         self.instance_uids.append(str(dataset.SOPInstanceUID))
 
 
-def test_synthetic_study_is_stored_by_network_receiver(tmp_path: Path) -> None:
-    source_files = create_synthetic_study(tmp_path / "synthetic", instances=2)
+def test_synthetic_study_is_stored_by_network_receiver(
+    tmp_path: Path,
+    synthetic_ultrasound_paths: list[Path],
+) -> None:
+    source_files = synthetic_ultrasound_paths
     publisher = RecordingPublisher()
     receiver = create_receiver(
         ReceiverSettings(

@@ -1,0 +1,11 @@
+{
+  "classification": "demo-positive",
+  "detections": [
+    {
+      "box": [59, 10, 60, 52],
+      "confidence": 0.410833,
+      "label": "mock-region"
+    }
+  ],
+  "classification_score": 0.5
+}

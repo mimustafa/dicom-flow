@@ -1,9 +1,9 @@
 services:
   redis:
-    image: redis:7-alpine
+    image: redis@sha256:8da19c7399dca900c6822a1cf30f9d2285585e2c4b457ff4095b0f4500054d3f
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -11,6 +11,29 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  orthanc:
+    image: orthancteam/orthanc@sha256:d2705f2c56547e55ce9bc2250fd22d05d326493b3f3d9fa191ecb7db8ca6b5a2
+    environment:
+      ORTHANC__NAME: dicom-flow-demo
+      ORTHANC__DICOM_AET: ORTHANC
+      ORTHANC__AUTHENTICATION_ENABLED: "true"
+      ORTHANC__REGISTERED_USERS: '{"dicom-flow":"${ORTHANC_PASSWORD:?Set ORTHANC_PASSWORD in .env}"}'
+      ORTHANC_PASSWORD: ${ORTHANC_PASSWORD:?Set ORTHANC_PASSWORD in .env}
+    volumes:
+      - orthanc-data:/var/lib/orthanc/db
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python3 -c "import base64, os, urllib.request;
+          token=base64.b64encode(('dicom-flow:'+os.environ['ORTHANC_PASSWORD']).encode()).decode();
+          req=urllib.request.Request('http://127.0.0.1:8042/system',
+          headers={'Authorization':'Basic '+token});
+          urllib.request.urlopen(req,timeout=3).read()"
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
   receiver:
     build: .
@@ -24,8 +47,13 @@ services:
       DICOM_FLOW_ALLOWED_CALLING_AE_TITLES: ${DICOM_FLOW_ALLOWED_CALLING_AE_TITLES:-SYNTHETIC_SCU}
       DICOM_FLOW_REDIS_URL: redis://redis:6379/0
       DICOM_FLOW_EVENT_STREAM: ${DICOM_FLOW_EVENT_STREAM:-dicom:instances}
+    healthcheck:
+      test: ["CMD", "python", "-m", "dicom_flow", "health", "receiver"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     ports:
-      - "${DICOM_FLOW_PORT:-11112}:${DICOM_FLOW_PORT:-11112}"
+      - "127.0.0.1:${DICOM_FLOW_PORT:-11112}:${DICOM_FLOW_PORT:-11112}"
     volumes:
       - received-data:/data/received
 
@@ -38,17 +66,59 @@ services:
     environment:
       DICOM_FLOW_REDIS_URL: redis://redis:6379/0
       DICOM_FLOW_EVENT_STREAM: ${DICOM_FLOW_EVENT_STREAM:-dicom:instances}
+      DICOM_FLOW_FORWARD_STREAM: ${DICOM_FLOW_FORWARD_STREAM:-dicom:forward}
       DICOM_FLOW_DEAD_LETTER_STREAM: ${DICOM_FLOW_DEAD_LETTER_STREAM:-dicom:dead-letter}
       DICOM_FLOW_CONSUMER_GROUP: ${DICOM_FLOW_CONSUMER_GROUP:-dicom-workers}
       DICOM_FLOW_CONSUMER_NAME: ${DICOM_FLOW_CONSUMER_NAME:-worker-1}
       DICOM_FLOW_STORAGE_DIR: /data/received
       DICOM_FLOW_REPORT_DIR: /data/reports
       DICOM_FLOW_MAX_ATTEMPTS: ${DICOM_FLOW_MAX_ATTEMPTS:-3}
+    healthcheck:
+      test: ["CMD", "python", "-m", "dicom_flow", "health", "worker"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     volumes:
       - received-data:/data/received
       - report-data:/data/reports
+
+  forwarder:
+    build: .
+    command: ["python", "-m", "dicom_flow", "forwarder"]
+    depends_on:
+      redis:
+        condition: service_healthy
+      orthanc:
+        condition: service_healthy
+    environment:
+      DICOM_FLOW_REDIS_URL: redis://redis:6379/0
+      DICOM_FLOW_FORWARD_STREAM: ${DICOM_FLOW_FORWARD_STREAM:-dicom:forward}
+      DICOM_FLOW_FORWARD_DEAD_LETTER_STREAM: ${DICOM_FLOW_FORWARD_DEAD_LETTER_STREAM:-dicom:forward-dead-letter}
+      DICOM_FLOW_FORWARD_CONSUMER_GROUP: ${DICOM_FLOW_FORWARD_CONSUMER_GROUP:-dicom-forwarders}
+      DICOM_FLOW_FORWARD_CONSUMER_NAME: ${DICOM_FLOW_FORWARD_CONSUMER_NAME:-forwarder-1}
+      DICOM_FLOW_REPORT_DIR: /data/reports
+      DICOM_FLOW_DESTINATION_HOST: ${DICOM_FLOW_DESTINATION_HOST:-orthanc}
+      DICOM_FLOW_DESTINATION_PORT: ${DICOM_FLOW_DESTINATION_PORT:-4242}
+      DICOM_FLOW_DESTINATION_AE_TITLE: ${DICOM_FLOW_DESTINATION_AE_TITLE:-ORTHANC}
+      DICOM_FLOW_TRUSTED_DESTINATION_HOSTS: ${DICOM_FLOW_TRUSTED_DESTINATION_HOSTS:-orthanc}
+      DICOM_FLOW_TRUSTED_DESTINATION_AE_TITLES: ${DICOM_FLOW_TRUSTED_DESTINATION_AE_TITLES:-ORTHANC}
+      DICOM_FLOW_CALLING_AE_TITLE: ${DICOM_FLOW_CALLING_AE_TITLE:-DICOMFLOW}
+      DICOM_FLOW_FORWARD_MAX_ATTEMPTS: ${DICOM_FLOW_FORWARD_MAX_ATTEMPTS:-3}
+      DICOM_FLOW_TLS_ENABLED: ${DICOM_FLOW_TLS_ENABLED:-false}
+      DICOM_FLOW_TLS_CA_FILE: ${DICOM_FLOW_TLS_CA_FILE:-}
+      DICOM_FLOW_TLS_CLIENT_CERT: ${DICOM_FLOW_TLS_CLIENT_CERT:-}
+      DICOM_FLOW_TLS_CLIENT_KEY: ${DICOM_FLOW_TLS_CLIENT_KEY:-}
+    healthcheck:
+      test: ["CMD", "python", "-m", "dicom_flow", "health", "forwarder"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - report-data:/data/reports:ro
+      - ./certs:/run/dicom-flow-tls:ro
 
 volumes:
   received-data:
   report-data:
   redis-data:
+  orthanc-data:

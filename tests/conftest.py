@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from redis import Redis
@@ -20,3 +21,10 @@ def redis_client() -> Iterator[Redis]:
         yield client
     finally:
         client.close()
+
+
+@pytest.fixture
+def synthetic_ultrasound_paths(tmp_path: Path) -> list[Path]:
+    from dicom_flow.synthetic import create_synthetic_study
+
+    return create_synthetic_study(tmp_path / "synthetic-fixture", instances=2, seed=41)

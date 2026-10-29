@@ -191,3 +191,7 @@ __marimo__/
 # Local generated test data
 data/
 .DS_Store
+certs/
+*.key
+*.pem
+*.p12
