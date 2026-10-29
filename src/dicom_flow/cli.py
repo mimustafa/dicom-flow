@@ -3,11 +3,12 @@ import logging
 from collections.abc import Sequence
 from pathlib import Path
 
-from dicom_flow.common.config import ReceiverSettings
+from dicom_flow.common.config import ReceiverSettings, WorkerSettings
 from dicom_flow.common.logging import configure_logging
 from dicom_flow.receiver.client import collect_dicom_files, send_instances
 from dicom_flow.receiver.server import create_receiver
 from dicom_flow.synthetic import create_synthetic_study
+from dicom_flow.worker.consumer import run_worker
 
 LOGGER = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ def _parser() -> argparse.ArgumentParser:
     generate.add_argument("--seed", type=int, default=1)
 
     commands.add_parser("serve", help="run the DICOM C-STORE receiver")
+    commands.add_parser("worker", help="run the Redis-backed DICOM processing worker")
 
     send = commands.add_parser("send", help="C-ECHO and C-STORE DICOM files to a receiver")
     send.add_argument("path", type=Path)
@@ -50,6 +52,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         except KeyboardInterrupt:
             LOGGER.info("receiver_stopping")
             server.shutdown()
+        return
+
+    if args.command == "worker":
+        run_worker(WorkerSettings())
         return
 
     files = collect_dicom_files(args.path)

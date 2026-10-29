@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from pydicom import dcmread
+from pydicom.dataset import Dataset
 from pynetdicom import AE
 
 from dicom_flow.common.config import ReceiverSettings
@@ -9,8 +10,17 @@ from dicom_flow.receiver.server import create_receiver
 from dicom_flow.synthetic import create_synthetic_study
 
 
+class RecordingPublisher:
+    def __init__(self) -> None:
+        self.instance_uids: list[str] = []
+
+    def publish_instance(self, dataset: Dataset) -> None:
+        self.instance_uids.append(str(dataset.SOPInstanceUID))
+
+
 def test_synthetic_study_is_stored_by_network_receiver(tmp_path: Path) -> None:
     source_files = create_synthetic_study(tmp_path / "synthetic", instances=2)
+    publisher = RecordingPublisher()
     receiver = create_receiver(
         ReceiverSettings(
             ae_title="DICOMFLOW",
@@ -19,6 +29,7 @@ def test_synthetic_study_is_stored_by_network_receiver(tmp_path: Path) -> None:
             allowed_calling_ae_titles="SYNTHETIC_SCU",
         ),
         host="127.0.0.1",
+        publisher=publisher,
     )
     port = receiver.server_address[1]
     try:
@@ -37,6 +48,7 @@ def test_synthetic_study_is_stored_by_network_receiver(tmp_path: Path) -> None:
 
         stored_files = list((tmp_path / "received").rglob("*.dcm"))
         assert len(stored_files) == 2
+        assert len(publisher.instance_uids) == 2
         for source in source_files:
             original = dcmread(source)
             stored = tmp_path / "received" / str(original.StudyInstanceUID)

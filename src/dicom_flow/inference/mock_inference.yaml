@@ -1,0 +1,9 @@
+config_version: "1"
+model_version: "mock-yolo-classifier-1.0"
+seed: 2026
+preprocessing:
+  scale: 255.0
+detector:
+  confidence_threshold: 0.25
+classifier:
+  positive_threshold: 0.5

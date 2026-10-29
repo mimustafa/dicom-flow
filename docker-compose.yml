@@ -1,15 +1,54 @@
 services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   receiver:
     build: .
+    depends_on:
+      redis:
+        condition: service_healthy
     environment:
       DICOM_FLOW_AE_TITLE: ${DICOM_FLOW_AE_TITLE:-DICOMFLOW}
       DICOM_FLOW_PORT: ${DICOM_FLOW_PORT:-11112}
       DICOM_FLOW_STORAGE_DIR: /data/received
       DICOM_FLOW_ALLOWED_CALLING_AE_TITLES: ${DICOM_FLOW_ALLOWED_CALLING_AE_TITLES:-SYNTHETIC_SCU}
+      DICOM_FLOW_REDIS_URL: redis://redis:6379/0
+      DICOM_FLOW_EVENT_STREAM: ${DICOM_FLOW_EVENT_STREAM:-dicom:instances}
     ports:
       - "${DICOM_FLOW_PORT:-11112}:${DICOM_FLOW_PORT:-11112}"
     volumes:
       - received-data:/data/received
 
+  worker:
+    build: .
+    command: ["python", "-m", "dicom_flow", "worker"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      DICOM_FLOW_REDIS_URL: redis://redis:6379/0
+      DICOM_FLOW_EVENT_STREAM: ${DICOM_FLOW_EVENT_STREAM:-dicom:instances}
+      DICOM_FLOW_DEAD_LETTER_STREAM: ${DICOM_FLOW_DEAD_LETTER_STREAM:-dicom:dead-letter}
+      DICOM_FLOW_CONSUMER_GROUP: ${DICOM_FLOW_CONSUMER_GROUP:-dicom-workers}
+      DICOM_FLOW_CONSUMER_NAME: ${DICOM_FLOW_CONSUMER_NAME:-worker-1}
+      DICOM_FLOW_STORAGE_DIR: /data/received
+      DICOM_FLOW_REPORT_DIR: /data/reports
+      DICOM_FLOW_MAX_ATTEMPTS: ${DICOM_FLOW_MAX_ATTEMPTS:-3}
+    volumes:
+      - received-data:/data/received
+      - report-data:/data/reports
+
 volumes:
   received-data:
+  report-data:
+  redis-data:

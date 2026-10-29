@@ -12,6 +12,8 @@ dependencies = [
     "pydicom>=3.0,<4.0",
     "pynetdicom>=3.0,<4.0",
     "pydantic-settings>=2.7,<3.0",
+    "redis>=5.2,<7.0",
+    "PyYAML>=6.0,<7.0",
 ]
 
 [project.scripts]
@@ -48,5 +50,5 @@ packages = ["dicom_flow"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["pydicom.*", "pynetdicom.*"]
+module = ["pydicom.*", "pynetdicom.*", "yaml.*"]
 ignore_missing_imports = true
